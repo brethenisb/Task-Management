@@ -1,4 +1,4 @@
-root {
+:root {
   --bg: #eef2f9; --panel: #fff; --ink: #14213d; --muted: #5b6b82; --line: #d8e0ee;
   --red: #dc2626; --green: #16a34a; --blue: #2563eb; --amber: #d97706;
   --font: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;

@@ -1,0 +1,19 @@
+{
+    "sqltools.connections": [
+        {
+            "name": "TaskManagerDB",
+            "driver": "MySQL",
+            "server": "localhost",
+            "port": 3306,
+            "database": "taskmanager",
+            "username": "root",
+            "password": "Bretheni@18",
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50
+        }
+    ]
+}

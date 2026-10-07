@@ -81,7 +81,7 @@ def get_task(task_id):
 
 @app.get("/")
 def index():
-    return send_from_directory(FRONTEND_DIR, "task.html")
+    return send_from_directory(FRONTEND_DIR, "index.html")
 
 
 @app.get("/<path:filename>")

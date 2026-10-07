@@ -6,7 +6,7 @@ from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = BASE_DIR / "frontend"
+FRONTEND_DIR = BASE_DIR / "Frontend"
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 CORS(app)
@@ -16,6 +16,7 @@ DB = {
     "user": os.getenv("DB_USER", "root"),
     "password": os.getenv("DB_PASSWORD", "root1234"),
     "database": os.getenv("DB_NAME", "taskmanager"),
+    "use_pure": True,
 }
 
 CATEGORIES = {"task", "exam"}
@@ -81,7 +82,7 @@ def get_task(task_id):
 
 @app.get("/")
 def index():
-    return send_from_directory(FRONTEND_DIR, "index.html")
+   return send_from_directory(str(FRONTEND_DIR), "index.html")
 
 
 @app.get("/<path:filename>")
@@ -189,9 +190,8 @@ def delete_task(task_id):
 
     return "", 204
 
-
 if __name__ == "__main__":
     app.run(
-        debug=True,
+        debug=False,
         port=5000
     )

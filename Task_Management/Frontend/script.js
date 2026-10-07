@@ -1,4 +1,4 @@
-const API = "http://localhost:5000/api/tasks";
+const API = "/api/tasks";
 let tasks = [], filter = "all";
 
 const $ = id => document.getElementById(id);
@@ -11,11 +11,27 @@ const store = (k, v) => {
 const fired = new Set(JSON.parse(store("fired") || "[]"));
 
 async function api(path = "", opts = {}) {
-  const res = await fetch(API + path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const options = {
+    ...opts,
+    headers: {
+      ...(opts.headers || {})
+    }
+  };
+
+  if (opts.body) {
+    options.headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(API + path, options);
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || "Server error " + res.status + ". Check the python app.py terminal.");
+    throw new Error(
+      body.error ||
+      "Server error " + res.status + ". Check the python app.py terminal."
+    );
   }
+
   return res.status === 204 ? null : res.json();
 }
 

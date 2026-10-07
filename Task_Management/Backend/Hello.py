@@ -6,20 +6,15 @@ from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = BASE_DIR / "Frontend"
+FRONTEND_DIR = BASE_DIR / "frontend"
 
-app = Flask(
-    __name__,
-    static_folder=str(FRONTEND_DIR),
-    static_url_path=""
-)
-
+app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 CORS(app)
 
 DB = {
     "host": os.getenv("DB_HOST", "localhost"),
     "user": os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", ""),
+    "password": os.getenv("DB_PASSWORD", "root1234"),
     "database": os.getenv("DB_NAME", "taskmanager"),
 }
 
@@ -33,11 +28,6 @@ EDITABLE = {
     "remind_at",
     "is_done"
 }
-
-
-@app.errorhandler(mysql.connector.Error)
-def db_error(err):
-    return jsonify(error="Database error: " + str(err)), 500
 
 
 def run(sql, params=(), fetch=False):
@@ -69,7 +59,8 @@ def clean(row):
 
 
 def norm_dt(value):
-    """Convert 2026-10-06T18:30 to 2026-10-06 18:30:00."""
+    """'2026-10-06T18:30' -> '2026-10-06 18:30:00' (or None)."""
+
     if not value:
         return None
 
@@ -90,12 +81,15 @@ def get_task(task_id):
 
 @app.get("/")
 def index():
-    return send_from_directory(FRONTEND_DIR, "index.html")
+    return send_from_directory(FRONTEND_DIR, "task.html")
 
 
 @app.get("/<path:filename>")
 def serve_frontend(filename):
-    return send_from_directory(FRONTEND_DIR, filename)
+    try:
+        return send_from_directory(FRONTEND_DIR, filename)
+    except FileNotFoundError:
+        abort(404)
 
 
 @app.get("/api/tasks")
@@ -140,7 +134,7 @@ def create_task():
             priority,
             data.get("due_date") or None,
             norm_dt(data.get("remind_at"))
-        )
+        ),
     )
 
     return jsonify(get_task(new_id)), 201
@@ -179,10 +173,11 @@ def update_task(task_id):
 
     task = get_task(task_id)
 
-    if task:
-        return jsonify(task), 200
-
-    return jsonify(error="Task not found"), 404
+    return (
+        jsonify(task), 200
+    ) if task else (
+        jsonify(error="Task not found"), 404
+    )
 
 
 @app.delete("/api/tasks/<int:task_id>")
@@ -196,4 +191,7 @@ def delete_task(task_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(
+        debug=True,
+        port=5000
+    )

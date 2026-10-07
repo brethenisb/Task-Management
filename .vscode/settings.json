@@ -7,7 +7,7 @@
             "port": 3306,
             "database": "taskmanager",
             "username": "root",
-            "password": "Bretheni@18",
+            "password": "root1234",
             "mysqlOptions": {
                 "authProtocol": "default",
                 "enableSsl": "Disabled"

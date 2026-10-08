@@ -11,14 +11,6 @@ FRONTEND_DIR = BASE_DIR / "Frontend"
 app = Flask(__name__)
 CORS(app)
 
-DB = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "user": os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", "root1234"),
-    "database": os.getenv("DB_NAME", "taskmanager"),
-    "use_pure": True,
-}
-
 CATEGORIES = {"task", "exam"}
 PRIORITIES = {"high", "medium", "low"}
 
@@ -32,8 +24,29 @@ EDITABLE = {
 }
 
 
+def get_db_config():
+    config = {
+        "host": os.getenv("DB_HOST", "localhost"),
+        "user": os.getenv("DB_USER", "root"),
+        "password": os.getenv("DB_PASSWORD", "root1234"),
+        "database": os.getenv("DB_NAME", "taskmanager"),
+        "port": int(os.getenv("DB_PORT", "3306")),
+        "use_pure": True,
+    }
+
+    ssl_ca = os.getenv("DB_SSL_CA")
+    if ssl_ca:
+        config["ssl_ca"] = ssl_ca
+        config["ssl_verify_cert"] = True
+    elif os.getenv("DB_SSL_DISABLED", "").lower() in ("true", "1"):
+        config["ssl_disabled"] = True
+
+    return config
+
+
 def run(sql, params=(), fetch=False):
-    conn = mysql.connector.connect(**DB)
+    db_config = get_db_config()
+    conn = mysql.connector.connect(**db_config)
     cur = None
 
     try:
@@ -68,7 +81,7 @@ def norm_dt(value):
     if not value:
         return None
 
-    value = value.replace("T", " ")
+    value = str(value).replace("T", " ")
 
     if len(value) == 16:
         value += ":00"
@@ -237,12 +250,27 @@ def delete_task(task_id):
     return "", 204
 
 
+@app.errorhandler(mysql.connector.Error)
+def handle_db_error(error):
+    msg = error.msg if hasattr(error, "msg") else str(error)
+    return jsonify({
+        "error": f"Database connection error: {msg}. Ensure DB environment variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME) are configured."
+    }), 500
+
+
 @app.errorhandler(404)
 def page_not_found(error):
     return jsonify({
         "error": "Route not found",
         "path": request.path
     }), 404
+
+
+@app.errorhandler(Exception)
+def handle_generic_error(error):
+    return jsonify({
+        "error": f"Server error: {str(error)}"
+    }), 500
 
 
 if __name__ == "__main__":

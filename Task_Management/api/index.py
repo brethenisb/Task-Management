@@ -1,3 +1,12 @@
+import sys
+from pathlib import Path
+
+# Add project root to sys.path so Backend package can be resolved by Vercel
+root_dir = Path(__file__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+
 from Backend.app import app
 
-application = app
+# Vercel serverless WSGI entrypoint
+app = app

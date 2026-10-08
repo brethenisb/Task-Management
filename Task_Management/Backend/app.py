@@ -8,7 +8,7 @@ from flask_cors import CORS
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "Frontend"
 
-app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
+app = Flask(__name__)
 CORS(app)
 
 DB = {
@@ -21,6 +21,7 @@ DB = {
 
 CATEGORIES = {"task", "exam"}
 PRIORITIES = {"high", "medium", "low"}
+
 EDITABLE = {
     "title",
     "category",
@@ -33,6 +34,7 @@ EDITABLE = {
 
 def run(sql, params=(), fetch=False):
     conn = mysql.connector.connect(**DB)
+    cur = None
 
     try:
         cur = conn.cursor(dictionary=True)
@@ -45,6 +47,8 @@ def run(sql, params=(), fetch=False):
         return cur.lastrowid
 
     finally:
+        if cur:
+            cur.close()
         conn.close()
 
 
@@ -54,20 +58,22 @@ def clean(row):
         for k, v in row.items()
     }
 
-    out["is_done"] = bool(out["is_done"])
+    if "is_done" in out:
+        out["is_done"] = bool(out["is_done"])
 
     return out
 
 
 def norm_dt(value):
-    """'2026-10-06T18:30' -> '2026-10-06 18:30:00' (or None)."""
-
     if not value:
         return None
 
     value = value.replace("T", " ")
 
-    return value + ":00" if len(value) == 16 else value
+    if len(value) == 16:
+        value += ":00"
+
+    return value
 
 
 def get_task(task_id):
@@ -80,33 +86,58 @@ def get_task(task_id):
     return clean(rows[0]) if rows else None
 
 
+@app.get("/api")
+def api_status():
+    return jsonify({
+        "status": "success",
+        "message": "Task Management API is running"
+    })
+
+
 @app.get("/")
 def index():
-   return send_from_directory(str(FRONTEND_DIR), "index.html")
+    index_file = FRONTEND_DIR / "index.html"
+
+    if not index_file.exists():
+        return jsonify({
+            "error": "Frontend index.html not found"
+        }), 404
+
+    return send_from_directory(
+        str(FRONTEND_DIR),
+        "index.html"
+    )
 
 
 @app.get("/<path:filename>")
 def serve_frontend(filename):
-    try:
-        return send_from_directory(FRONTEND_DIR, filename)
-    except FileNotFoundError:
+    file_path = FRONTEND_DIR / filename
+
+    if not file_path.exists():
         abort(404)
+
+    return send_from_directory(
+        str(FRONTEND_DIR),
+        filename
+    )
 
 
 @app.get("/api/tasks")
 def list_tasks():
     rows = run(
         """
-        SELECT * FROM tasks
-        ORDER BY is_done,
-                 due_date IS NULL,
-                 due_date,
-                 created_at DESC
+        SELECT *
+        FROM tasks
+        ORDER BY
+            is_done,
+            due_date IS NULL,
+            due_date,
+            created_at DESC
         """,
         fetch=True
     )
 
-    return jsonify([clean(r) for r in rows])
+    return jsonify([clean(row) for row in rows])
 
 
 @app.post("/api/tasks")
@@ -118,10 +149,19 @@ def create_task():
     priority = data.get("priority", "medium")
 
     if not title:
-        return jsonify(error="Title is required"), 400
+        return jsonify({
+            "error": "Title is required"
+        }), 400
 
-    if category not in CATEGORIES or priority not in PRIORITIES:
-        return jsonify(error="Invalid category or priority"), 400
+    if category not in CATEGORIES:
+        return jsonify({
+            "error": "Invalid category"
+        }), 400
+
+    if priority not in PRIORITIES:
+        return jsonify({
+            "error": "Invalid priority"
+        }), 400
 
     new_id = run(
         """
@@ -135,7 +175,7 @@ def create_task():
             priority,
             data.get("due_date") or None,
             norm_dt(data.get("remind_at"))
-        ),
+        )
     )
 
     return jsonify(get_task(new_id)), 201
@@ -149,7 +189,6 @@ def update_task(task_id):
     vals = []
 
     for key in EDITABLE & data.keys():
-
         value = data[key]
 
         if key == "remind_at":
@@ -165,20 +204,27 @@ def update_task(task_id):
         vals.append(value)
 
     if not sets:
-        return jsonify(error="Nothing to update"), 400
+        return jsonify({
+            "error": "Nothing to update"
+        }), 400
 
     run(
-        f"UPDATE tasks SET {', '.join(sets)} WHERE id = %s",
+        f"""
+        UPDATE tasks
+        SET {", ".join(sets)}
+        WHERE id = %s
+        """,
         (*vals, task_id)
     )
 
     task = get_task(task_id)
 
-    return (
-        jsonify(task), 200
-    ) if task else (
-        jsonify(error="Task not found"), 404
-    )
+    if not task:
+        return jsonify({
+            "error": "Task not found"
+        }), 404
+
+    return jsonify(task), 200
 
 
 @app.delete("/api/tasks/<int:task_id>")
@@ -190,8 +236,18 @@ def delete_task(task_id):
 
     return "", 204
 
+
+@app.errorhandler(404)
+def page_not_found(error):
+    return jsonify({
+        "error": "Route not found",
+        "path": request.path
+    }), 404
+
+
 if __name__ == "__main__":
     app.run(
-        debug=False,
-        port=5000
+        host="0.0.0.0",
+        port=5000,
+        debug=False
     )
